@@ -10,4 +10,4 @@ Hello!
 Here is a list of modules:
 
 - [Data cleaning file](data_cleaning.html)
-- [Rmarkdown training](rmarkdown_training.Rmd)
+- [Rmarkdown training](rmarkdown_training.html)
