@@ -1,6 +1,13 @@
 ---
-title: "Uploading to the Web"
+title: "My website for R files for NCEAS workshop"
 output: html_document
 ---
 
-Hello
+Hello!
+
+## List of modules
+
+Here is a list of modules:
+
+- [Data cleaning file](data_cleaning.html)
+- [Rmarkdown training](rmarkdown_training.Rmd)
