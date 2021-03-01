@@ -1,0 +1,120 @@
+---
+title: "data_cleaning"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load packages
+```{r message=FALSE}
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+Here we will load our data
+```{r message=F}
+catch_original<-read_csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.302.1")
+```
+A pipe is basically saying "and then". Here is an example of how you can see what a pipe does.
+```{r}
+sum(1:10)
+1:10 %>% sum()
+```
+
+We can use the select command to remove columns from our dataset. 
+```{r}
+catch_data<- catch_original %>% 
+  select(Region:Chum) # or select(-All, -notesRegCode)
+```
+ Now we are going to use the mutate function because we noticed that the Chinook column was characters, not numbers.
+```{r}
+catch_clean<-catch_data %>% 
+  mutate(Chinook = as.numeric(Chinook))
+```
+ It says there is a problem. NAs introduced by coercion.
+```{r}
+#Where is the problem
+i<- which(is.na(catch_clean$Chinook)) #401
+#What is there?
+catch_clean[i,] # There is an NA
+catch_data[i,] # We see the original data had an I there. Because it was scanned in so the 1 came out as an I. 
+```
+ Now let's clean this properly
+```{r}
+catch_clean<-catch_data %>% 
+  mutate(Chinook = ifelse(Chinook == "I", 1,Chinook)) %>% 
+  mutate(Chinook = as.numeric(Chinook))
+```
+Now we want to put this into long form
+```{r}
+catch_long<-catch_clean %>% 
+  pivot_longer(cols = -c(Region, Year), names_to = "species", values_to = "catch") #Put a minus next to the column names you don't want to pivot with
+catch_wide<- catch_long %>% 
+  pivot_wider(names_from = "species", values_from = "catch")
+```
+Let's rename one of the columns
+```{r}
+catch_long<- catch_long %>% 
+  rename(catch_thousands = catch)
+
+catch_long <- catch_long %>% 
+  mutate(catch = catch_thousands * 1000) %>% 
+  select(-catch_thousands)
+```
+Summarize by mean and counts
+```{r}
+mean_region<- catch_long %>% 
+  group_by(Region) %>% 
+ summarise(catch_mean = mean(catch))%>% 
+  arrange(desc(catch_mean)) # sort in descending order
+
+n_region<-catch_long %>% 
+  group_by(Region) %>% 
+  summarise(n=n()) 
+
+```
+Look at just the dat from SSE region
+```{r}
+SSE_catch<-catch_long %>% 
+  filter(Region == "SSE")
+table(SSE_catch$Region)
+```
+Let's cover joins now
+```{r}
+region_defs <- read_csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.303.1") %>% 
+    select(code, mgmtArea)
+
+catch_joined <-left_join(catch_long, region_defs, by=c("Region"="code"))# by is mapping between primary and foreign key
+```
+
+Separate and unite columns
+```{r}
+sites_df <- data.frame(site = c("HAW-101",
+                                "HAW-103",
+                                "OAH-320",
+                                "OAH-219",
+                                "MAI-039"),
+                       stringsAsFactors = FALSE)
+
+sites_df %>% 
+  separate(site, c("island", "site_number"), "-")
+```
+Here is using unite useful for dates
+```{r}
+dates_df <- data.frame(year = c("1930",
+                                "1930",
+                                "1930"),
+                       month = c("12",
+                                "12",
+                                "12"),
+                       day = c("14",
+                               "15",
+                               "16"),
+                       stringsAsFactors = FALSE)
+
+dates_df<-dates_df %>% 
+  unite(date, year, month, day, sep = "-")
+```
+
+
