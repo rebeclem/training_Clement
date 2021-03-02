@@ -203,7 +203,105 @@ library(readr)</code></pre>
 <pre><code>## [1] 55</code></pre>
 <pre class="r"><code>1:10 %&gt;% sum()</code></pre>
 <pre><code>## [1] 55</code></pre>
-<p>sum(1:10)</p>
+<p>We can use the select command to remove columns from our dataset.</p>
+<pre class="r"><code>catch_data&lt;- catch_original %&gt;% 
+  select(Region:Chum) # or select(-All, -notesRegCode)</code></pre>
+<p>Now we are going to use the mutate function because we noticed that the Chinook column was characters, not numbers.</p>
+<pre class="r"><code>catch_clean&lt;-catch_data %&gt;% 
+  mutate(Chinook = as.numeric(Chinook))</code></pre>
+<pre><code>## Warning: Problem with `mutate()` input `Chinook`.
+## ℹ NAs introduced by coercion
+## ℹ Input `Chinook` is `as.numeric(Chinook)`.</code></pre>
+<pre><code>## Warning in mask$eval_all_mutate(dots[[i]]): NAs introduced by coercion</code></pre>
+<p>It says there is a problem. NAs introduced by coercion.</p>
+<pre class="r"><code>#Where is the problem
+i&lt;- which(is.na(catch_clean$Chinook)) #401
+#What is there?
+catch_clean[i,] # There is an NA</code></pre>
+<pre><code>## # A tibble: 1 x 7
+##   Region  Year Chinook Sockeye  Coho  Pink  Chum
+##   &lt;chr&gt;  &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+## 1 GSE     1955      NA      66     0     0     1</code></pre>
+<pre class="r"><code>catch_data[i,] # We see the original data had an I there. Because it was scanned in so the 1 came out as an I. </code></pre>
+<pre><code>## # A tibble: 1 x 7
+##   Region  Year Chinook Sockeye  Coho  Pink  Chum
+##   &lt;chr&gt;  &lt;dbl&gt; &lt;chr&gt;     &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+## 1 GSE     1955 I            66     0     0     1</code></pre>
+<p>Now let’s clean this properly</p>
+<pre class="r"><code>catch_clean&lt;-catch_data %&gt;% 
+  mutate(Chinook = ifelse(Chinook == &quot;I&quot;, 1,Chinook)) %&gt;% 
+  mutate(Chinook = as.numeric(Chinook))</code></pre>
+<p>Now we want to put this into long form</p>
+<pre class="r"><code>catch_long&lt;-catch_clean %&gt;% 
+  pivot_longer(cols = -c(Region, Year), names_to = &quot;species&quot;, values_to = &quot;catch&quot;) #Put a minus next to the column names you don&#39;t want to pivot with
+catch_wide&lt;- catch_long %&gt;% 
+  pivot_wider(names_from = &quot;species&quot;, values_from = &quot;catch&quot;)</code></pre>
+<p>Let’s rename one of the columns</p>
+<pre class="r"><code>catch_long&lt;- catch_long %&gt;% 
+  rename(catch_thousands = catch)
+
+catch_long &lt;- catch_long %&gt;% 
+  mutate(catch = catch_thousands * 1000) %&gt;% 
+  select(-catch_thousands)</code></pre>
+<p>Summarize by mean and counts</p>
+<pre class="r"><code>mean_region&lt;- catch_long %&gt;% 
+  group_by(Region) %&gt;% 
+ summarise(catch_mean = mean(catch))%&gt;% 
+  arrange(desc(catch_mean)) # sort in descending order</code></pre>
+<pre><code>## `summarise()` ungrouping output (override with `.groups` argument)</code></pre>
+<pre class="r"><code>n_region&lt;-catch_long %&gt;% 
+  group_by(Region) %&gt;% 
+  summarise(n=n()) </code></pre>
+<pre><code>## `summarise()` ungrouping output (override with `.groups` argument)</code></pre>
+<p>Look at just the dat from SSE region</p>
+<pre class="r"><code>SSE_catch&lt;-catch_long %&gt;% 
+  filter(Region == &quot;SSE&quot;)
+table(SSE_catch$Region)</code></pre>
+<pre><code>## 
+## SSE 
+## 560</code></pre>
+<p>Let’s cover joins now</p>
+<pre class="r"><code>region_defs &lt;- read_csv(&quot;https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.303.1&quot;) %&gt;% 
+    select(code, mgmtArea)</code></pre>
+<pre><code>## Parsed with column specification:
+## cols(
+##   code = col_character(),
+##   mgmtArea = col_character(),
+##   areaClass = col_character(),
+##   regionCode = col_double(),
+##   notes = col_character()
+## )</code></pre>
+<pre class="r"><code>catch_joined &lt;-left_join(catch_long, region_defs, by=c(&quot;Region&quot;=&quot;code&quot;))# by is mapping between primary and foreign key</code></pre>
+<p>Separate and unite columns</p>
+<pre class="r"><code>sites_df &lt;- data.frame(site = c(&quot;HAW-101&quot;,
+                                &quot;HAW-103&quot;,
+                                &quot;OAH-320&quot;,
+                                &quot;OAH-219&quot;,
+                                &quot;MAI-039&quot;),
+                       stringsAsFactors = FALSE)
+
+sites_df %&gt;% 
+  separate(site, c(&quot;island&quot;, &quot;site_number&quot;), &quot;-&quot;)</code></pre>
+<pre><code>##   island site_number
+## 1    HAW         101
+## 2    HAW         103
+## 3    OAH         320
+## 4    OAH         219
+## 5    MAI         039</code></pre>
+<p>Here is using unite useful for dates</p>
+<pre class="r"><code>dates_df &lt;- data.frame(year = c(&quot;1930&quot;,
+                                &quot;1930&quot;,
+                                &quot;1930&quot;),
+                       month = c(&quot;12&quot;,
+                                &quot;12&quot;,
+                                &quot;12&quot;),
+                       day = c(&quot;14&quot;,
+                               &quot;15&quot;,
+                               &quot;16&quot;),
+                       stringsAsFactors = FALSE)
+
+dates_df&lt;-dates_df %&gt;% 
+  unite(date, year, month, day, sep = &quot;-&quot;)</code></pre>
 
 
 
