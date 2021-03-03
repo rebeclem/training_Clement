@@ -1,0 +1,27 @@
+---
+title: "Shapefiles"
+author: "Rebecca Clement"
+date: "3/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries
+```{r message=False}
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(scales)
+library(ggmap)
+```
+Read in shapefile using sf and look at part of it
+```{r}
+ak_regions <- read_sf("shapefiles/ak_regions_simp.shp")
+plot(ak_regions)  
+```
+
+

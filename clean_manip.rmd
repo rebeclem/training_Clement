@@ -1,0 +1,120 @@
+---
+title: "Cleaning and Manipulating data with shorebird analysis"
+author: "Rebecca Clement"
+date: "3/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load libraries
+```{r message=False}
+library(rvest) #allows scraping data from websites
+library(readr)
+library(dplyr)
+library(janitor)
+library(ggplot2)
+```
+1. Load the species table using the code in the Setup block below.
+```{r}
+webpage <- read_html("https://www.pwrc.usgs.gov/bbl/manual/speclist.cfm")
+
+tbls <- html_nodes(webpage, "table") %>% 
+    html_table(fill = TRUE)
+
+species <- tbls[[1]] %>% 
+    clean_names() %>% 
+    select(alpha_code, common_name) %>% 
+    mutate(alpha_code = tolower(alpha_code))
+```
+
+2. Read the following two files into your environment.
+
+ - Utqiagvik_predator_surveys.csv
+ - Utqiagvik_nest_data.csv
+```{r message=FALSE, warning=FALSE}
+predators<-read_csv("https://arcticdata.io/metacat/d1/mn/v2/object/urn%3Auuid%3A9ffec04c-7e2d-41dd-9e88-b6c2e8c4375e")
+nestdata<-read_csv("https://arcticdata.io/metacat/d1/mn/v2/object/urn%3Auuid%3A982bd2fc-4edf-4da7-96ef-0d11b853102d")
+```
+3. Write a function that will translate species codes into common names.
+
+Hint: The fastest way to do this involves adding a column to the data.frame. Your function will have two arguments
+```{r}
+code_to_com_name<-function(nestdata,spcode_df){
+  new_df<-left_join(nestdata,spcode_df,by=c("species"="alpha_code"))
+    return(new_df)
+}
+nestdata2<-code_to_com_name(nestdata,species)
+predators2<-code_to_com_name(predators,species)
+#what if I want to have it return a column instead of a df
+code_to_com_name_column_only<-function(nestdata,spcode_df){
+  new_col<-spcode_df[nestdata,spcode_df,by=c("species"="alpha_code"))
+    return(new_df)
+}
+```
+
+Optional Extra Challenge: For a little extra challenge, try to incorporate an if statement that looks for NA values in the common name field you are adding. What other conditionals might you include to make your function smarter?
+```{r}
+assign_species_name <- function(df, species){
+    if (!("alpha_code" %in% names(species)) |
+        !("species" %in% names(df)) |
+        !("common_name" %in% names(species))){
+      stop("Tables appear to be formatted incorrectly.")
+    }  
+  
+    return_df <- left_join(df, species, by = c("species" = "alpha_code"))
+    
+    if (nrow(return_df) > nrow(df)){
+      warning("Joined table has more rows than original table. Check species table for duplicated code values.")
+    }
+    
+    if (length(which(is.na(return_df$common_name))) > 0){
+      x <- length(which(is.na(return_df$common_name)))
+      warning(paste("Common name has", x, "rows containing NA"))
+    }
+    
+    return(return_df)
+        
+}
+assign_species_name(predators,species)
+
+```
+
+Calculate total number of predators by year and species, and plot the result.
+```{r}
+tot_pred<-predators2 %>% 
+  group_by(year,common_name) %>% 
+  summarise(pred_count=sum(count, na.rm=T))
+
+ggplot(tot_pred,aes(x=year,y=pred_count,fill=common_name))+
+  geom_col()+
+  theme_classic()+
+  theme_light()
+```
+
+Calculate total number of eggs predated by year and species.
+```{r}
+tot_eggs<-nestdata2 %>% 
+  group_by(common_name,year) %>% 
+  summarise(egg_count=sum(number_eggs_predated))
+ggplot(tot_eggs,aes(x=year,y=egg_count,fill=common_name))+
+  geom_col()+
+  theme_classic()+
+  theme_light()
+```
+
+Calculate total number of predators by year, join to summarized egg predation table, and plot the result.
+```{r}
+yearly_pred<- predators2 %>% 
+  group_by(year) %>% 
+  summarise(tot_pred=n())
+
+eggpred<-left_join(tot_eggs,yearly_pred)
+ggplot(eggpred, aes(x=year,y=egg_count,group=common_name,color=common_name))+
+  geom_point()+
+  geom_line()+
+  geom_point(aes(x=year,y=tot_pred,fill="red"))+
+  theme_classic()
+```
+

@@ -1,0 +1,46 @@
+---
+title: "dates.Rmd"
+author: "Rebecca Clement"
+date: "3/2/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load libraries
+```{r}
+library(lubridate)
+library(dplyr)
+```
+```{r}
+dates1<-data.frame(dates=c("2021-01-02","2021-01-03","2021-02-04")) %>% 
+  mutate(dates=as.Date(dates))
+str(dates1)
+```
+```{r}
+data.frame(dates=c("20210102","20210104", "20210204")) %>% 
+  mutate(dates=ymd(dates))
+```
+```{r}
+data.frame(dates=c("Jan 1 1890","1/4/70","September 18, 1880","03 06 20")) %>% 
+  mutate(dates=mdy(dates)) %>% 
+  mutate(year=year(dates)) %>% 
+  mutate(hour=hour(dates)) %>% 
+  mutate(weekday= wday(dates,label=TRUE))
+```
+When you have really weird dates
+```{r}
+inconsistent_dates<-c("2009-01-01","20090101","01-01-2009",
+                      "2009-4-3 12:59:59",
+                      "2008-04-03 12:11","2006-2-05 12:15")
+samples<- data.frame(id=seq_along(inconsistent_dates),
+                     Date=inconsistent_dates,
+                     value=rnorm(length(inconsistent_dates), 50,5))
+samples
+parse_date_time(samples$Date,
+                orders=c("ymd","mdy","ymd HMS","ymd H"))
+```
+
